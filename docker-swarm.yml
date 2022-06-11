@@ -1,0 +1,71 @@
+version: '3'
+services:
+  postgres:
+    image: 'postgres:latest'
+    environment:
+      - POSTGRES_PASSWORD=postgres_password
+    deploy:
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints: [node.role == manager]
+      replicas: 1
+      resources:
+        reservations:
+          memory: 32M
+  redis:
+    image: 'redis:latest'
+    ports:
+      - "6379:6379"
+    deploy:
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints: [node.role == manager]
+  nginx:
+    depends_on:
+      - api
+      - client
+    image: dawiddrzew/nginx
+    ports:
+      - '3050:80'
+    deploy:
+      restart_policy:
+        condition: on-failure
+  api:
+    image: dawiddrzew/server
+    volumes:
+      - /app/node_modules
+      - ./server:/app
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - PGUSER=postgres
+      - PGHOST=postgres
+      - PGDATABASE=postgres
+      - PGPASSWORD=postgres_password
+      - PGPORT=5432
+    deploy:
+      restart_policy:
+        condition: on-failure
+  client:
+    stdin_open: true
+    image: dawiddrzew/client
+    volumes:
+      - /app/node_modules
+      - ./client:/app
+    deploy:
+      restart_policy:
+        condition: on-failure
+  worker:
+    image: dawiddrzew/worker
+    volumes:
+      - /app/node_modules
+      - ./worker:/app
+    deploy:
+      restart_policy:
+        condition: on-failure
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - NODE_OPTIONS=--openssl-legacy-provider
